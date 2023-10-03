@@ -1,10 +1,6 @@
 .DS_Store
 __pycache__
-christoffel_symbols_study.py
-delete_this.py
-finite_horizon_LTI_PO.py
 gradient_and_hessian_study.py
-OLQR_gradient_descent.py
 OLQR_study.py
 omega_stability.py
 study_on_stability_margins.py
