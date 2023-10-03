@@ -1,2 +1,2 @@
 .DS_Store
-./scripts/ignored_scripts/*
+.ignored_scripts/
