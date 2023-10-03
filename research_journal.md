@@ -1,10 +1,10 @@
 There are research notes related to my studies on #robust-control-theory, #policy-optimization.
 
 # Latex Commands
-$\newcommand{\inner}[1]{\langle 1 \rangle}$
-$\newcommand{\mat}[1]{\begin{bmatrix} 1 \end{bmatrix}}$
-$\newcommand{\bb}[1]{\mathbb{1}}$
-$\newcommand{\cal}[1]{\mathcal{1}}$
+$\newcommand{\inner}[1]{\langle #1 \rangle}$
+$\newcommand{\mat}[1]{\begin{bmatrix} #1 \end{bmatrix}}$
+$\newcommand{\bb}[1]{\mathbb{#1}}$
+$\newcommand{\cal}[1]{\mathcal{#1}}$
 $\newcommand{\tr}{\text{tr}}$
 $\newcommand{\E}{\bb{E}}$
 $\newcommand{\Bern}{\text{Bernoulli}}$
@@ -16,14 +16,18 @@ $\newcommand{\diag}{\text{diag}}$
 # Journal
 
 ## 10/2/23
-Suppose we have $x_{k+1}=Ax_k+Bu_k$ and $B \in \R^{n \times n}$ is invertible. Then the map $g(K) =A+BK$ is invertible with $g^{-1}(K)=B^{-1}(M-A)$. Suppose I want to solve the following problem:
-
+Suppose we have $x_{k+1}=Ax_k+Bu_k$. I grown interest in solving the following problem:
 $$\begin{align} \min_{K \in \cal{G}} f(K) \\ 
-\rho(A+BK) \geq \epsilon \end{align}$$
+\rho(A+BK) \leq \epsilon \end{align}$$
 
-This can probably be solved with projected gradient descent. Define $\cal{G}_\epsilon:=\{K \in \R^{m \times n}:\epsilon \leq \rho(A+BK) <1\}$. Let $K \in \cal{G}-\cal{G}_\epsilon$. What is $$\Pi_{\cal{G}_\epsilon}(K) := \min_{L \in \cal{G}_\epsilon}\|K-L\|$$ where $\|.\|$ is the Frobenius norm. Note $\|K-L\|=\|B^{-1}(V-W)\|$, where $V=g^{-1}(K)$ and $W=g^{-1}(L)$. So $\|K-L\|\leq \|B^{-1}\|\|V-W\|$. It follows $$\Pi_{\cal{G}_\epsilon}(K) \leq \|B^{-1}\|\min_{W \in \cal{S}^c}\|V-W\|=\|B^{-1}\|\Pi_{\cal{S}_\epsilon}(V),$$ where $\cal{S}:=\{V:\rho(V) <1 \}$ and $\cal{S}_{\epsilon}:=\{V \in \R^{n \times n}:\epsilon \leq \rho(V) <1 \}$. I find this inequality very exciting since $A$ makes no appearance.
+Note that the robust constraint $\rho(A+BK)$ has other forms, such as $s_{\cal{G}}(K)\geq \epsilon$ or $s_{\cal{S}}(A+BK)\geq \epsilon$. All 3 are heavily related to one another. The latter also has a closed form expression:
+$$s_{\cal{S}}(A+BK)=\min_{\theta \in (-\pi,\pi]} \sigma_\min(A+BK-e^{j\theta}I)$$
 
-Furthermore, there are ways of computing $\Pi_{\cal{S}_\epsilon}(V)$
+However the constraint $\rho(A+BK)$ has some interesting properties I could take advantage of. The problem could be solved via gradient descent. 
+
+To make the problem more approachable, I will assume $B \in \R^{n \times n}$ is invertible. So, the map $g:K \mapsto A+BK$ is invertible with $g^{-1}(V)=B^{-1}(V-A)$. Define $$\cal{G}_\epsilon:=\{K \in \R^{m \times n}:0\leq \rho(A+BK) \leq \epsilon \}.$$ Let $K \in \cal{G}-\cal{G}_\epsilon$. What is $$\Pi_{\cal{G}_\epsilon}(K) := \min_{L \in \cal{G}_\epsilon}\|K-L\|,$$ where $\|.\|$ is the Frobenius norm? Note $\|K-L\|=\|B^{-1}(V-W)\|$, where $V=A+BK$ and $W=A+BL$. So $\|K-L\|\leq \|B^{-1}\|\|V-W\|$. It follows $$\Pi_{\cal{G}_\epsilon}(K) \leq \|B^{-1}\|\min_{W \in \cal{S}^c}\|V-W\|=\|B^{-1}\|\Pi_{\cal{S}_\epsilon}(V),$$ where $\cal{S}:=\{V:\rho(V) <1 \}$ and $\cal{S}_{\epsilon}:=\{V \in \R^{n \times n}:0 \leq \rho(V) \leq \epsilon \}$. I find this upper bound very exciting since $A$ makes no appearance.
+
+Furthermore, there are ways of computing $\Pi_{\cal{S}_\epsilon}(V)$. I'm going to investigate them and see if they help with computing the projected gradient descent. 
 
 ## 9/29/23
 I came up with a cool concept. Let $$\cal{S}:=\{A \in \R^{n \times n}:\rho(A)<1\}$$ be the space of Schur stable matrices. Define $$\cal{G}:=\{K \in \R^{m \times n}:\rho(A + BK)<1\}$$ be the space of stabilizing gain matrices for controllable matrix pair $(A,B)$.
@@ -68,4 +72,4 @@ Suppose $K \in \cal{G} - \cal{G}_\epsilon$. What is the nearest matrix in $\cal{
 Suppose $\rho(A^*) \leq \epsilon<1$. How can I find $K \in \R^{m \times n}$ such that $A^* = A+BK$? 
 $K=B^{-1}(A^*-A)$
 
-It might make mroe sense to study the program $$\begin{align}\min f(K) \\ s_{\cal{S}}(A+BK) \geq \epsilon\end{align}$$ since we have a closed-form expression: $$s_{\cal{S}}(A+BK)=\min_{0 \leq \theta \leq 2\pi} \sigma_\min(A+BK-e^{j\theta}I)$$
+It might make mroe sense to study the program $$\begin{align}\min f(K) \\ s_{\cal{S}}(A+BK) \leq \epsilon\end{align}$$ since we have a closed-form expression: $$s_{\cal{S}}(A+BK)=\min_{0 \leq \theta \leq 2\pi} \sigma_\min(A+BK-e^{j\theta}I)$$
