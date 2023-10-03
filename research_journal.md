@@ -1,10 +1,10 @@
 There are research notes related to my studies on #robust-control-theory, #policy-optimization.
 
 # Latex Commands
-$\newcommand{\inner}[1]{\langle #1 \rangle}$
-$\newcommand{\mat}[1]{\begin{bmatrix} #1 \end{bmatrix}}$
-$\newcommand{\bb}[1]{\mathbb{#1}}$
-$\newcommand{\cal}[1]{\mathcal{#1}}$
+$\newcommand{\inner}[1]{\langle 1 \rangle}$
+$\newcommand{\mat}[1]{\begin{bmatrix} 1 \end{bmatrix}}$
+$\newcommand{\bb}[1]{\mathbb{1}}$
+$\newcommand{\cal}[1]{\mathcal{1}}$
 $\newcommand{\tr}{\text{tr}}$
 $\newcommand{\E}{\bb{E}}$
 $\newcommand{\Bern}{\text{Bernoulli}}$
