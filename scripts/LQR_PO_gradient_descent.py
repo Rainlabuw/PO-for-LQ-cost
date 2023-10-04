@@ -1,8 +1,6 @@
 import methods
 import numpy as np 
 import matplotlib.pyplot as plt
-import control as ct
-from scipy.linalg import solve_discrete_lyapunov
 
 n = 4
 m = 3

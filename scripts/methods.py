@@ -53,7 +53,7 @@ class StabilizingGainManifold:
                 return A, B
         
     @staticmethod
-    def lyapunov_map(A: np.ndarray, Q: np.ndarray) -> np.ndarray:
+    def dlyap(A: np.ndarray, Q: np.ndarray) -> np.ndarray:
         """Discrete Lyapunov map. Returns the unique solution X to 
         X = AXA' + Q.
         
@@ -64,17 +64,17 @@ class StabilizingGainManifold:
         return solve_discrete_lyapunov(A, Q)
     
     @staticmethod
-    def diff_lyapunov_map(
+    def diff_dlyap(
         A: np.ndarray, Q: np.ndarray, E: np.ndarray, F: np.ndarray
     ) -> np.ndarray:
         """Computes differential of lyapunov map along tangent vectors E and F.
         A: (ndarray(n,n)) Schur stable matrix
         Q, E, F: (ndarray(n,n)) arbitrary matrix
         
-        Returns: (ndarray(n,n)) diff_lyapunov_map(A,Q)|_{E,F}"""
-        return StabilizingGainManifold.lyapunov_map(
-            A, E@StabilizingGainManifold.lyapunov_map(A, Q)@A.T + \
-            A@StabilizingGainManifold.lyapunov_map(A, Q)@E.T + F
+        Returns: (ndarray(n,n)) diff_dlyap(A,Q)|_{E,F}"""
+        return StabilizingGainManifold.dlyap(
+            A, E@StabilizingGainManifold.dlyap(A, Q)@A.T + \
+            A@StabilizingGainManifold.dlyap(A, Q)@E.T + F
         )
     
     def randvec(self, K: np.ndarray) -> np.ndarray:
@@ -143,13 +143,13 @@ class StabilizingGainManifold:
         Returns: (ndarray(n,n)) The unique solution P to 
         A_cl'*P*A_cl + K'RK + Q = P."""
         
-        return self.lyapunov_map(self.A_cl(K).T, K.T@self.R@K + self.Q)
+        return self.dlyap((self.A - self.B@K).T, K.T@self.R@K + self.Q)
     
     def dP(self, K: np.ndarray, V: np.ndarray) -> np.ndarray:
         """Differential of P at K along tangent vector V"""
 
-        return self.diff_lyapunov_map(
-            self.A_cl(K).T, self.Q + K.T@self.R@K,
+        return self.diff_dlyap(
+            (self.A - self.B@K).T, self.Q + K.T@self.R@K,
             -V.T@self.B.T,
             V.T@self.R@K + K.T@self.R@V
         )
@@ -163,7 +163,7 @@ class StabilizingGainManifold:
         Returns: (ndarray(n,n)) output of L(A - BK, Sigma)
         """
         
-        return self.lyapunov_map(self.A_cl(K), self.Sigma)
+        return self.dlyap(self.A - self.B@K, self.Sigma)
         
     def dY(self, K: np.ndarray, i1: int, i2: int) -> np.ndarray:
         """Differential of the Y(.) map evaluated on the local frame vector E_i. 
@@ -173,8 +173,8 @@ class StabilizingGainManifold:
         Returns: (ndarray(m,n)) dY(E_i) at K."""
         E_i = self.E(i1, i2) 
         
-        return self.diff_lyapunov_map(
-            self.A_cl(K), self.Sigma, -self.B@E_i, np.zeros((self.n, self.n))
+        return self.diff_dlyap(
+            self.A - self.B@K, self.Sigma, -self.B@E_i, np.zeros((self.n, self.n))
         )
     
     def f(self, K: np.ndarray) -> float:
@@ -203,18 +203,18 @@ class StabilizingGainManifold:
         
         P_K = self.P(K)
         Y_K = self.Y(K)
+        out = self.R@K - self.B.T@P_K@(self.A - self.B@K)
         if Euclidean:
-            return (self.R@K - self.B.T@P_K@self.A_cl(K))@Y_K
-        else: 
-            return self.R@K - self.B.T@P_K@self.A_cl(K)
+            return out@Y_K
+        return out
  
     def hess_f(
         self, K: np.ndarray, V: np.ndarray, W: np.ndarray, Euclidean: bool=False
     ) -> float:
-        A_cl_K = self.A_cl(K)
+        A_cl_K = self.A - self.B@K
         grad_f_K = self.grad_f(K, Euclidean=Euclidean)
-        S_KV = self.lyapunov_map(A_cl_K.T, V.T@grad_f_K + grad_f_K.T@V)
-        S_KW = self.lyapunov_map(A_cl_K.T, W.T@grad_f_K + grad_f_K.T@W)
+        S_KV = self.dlyap(A_cl_K.T, V.T@grad_f_K + grad_f_K.T@V)
+        S_KW = self.dlyap(A_cl_K.T, W.T@grad_f_K + grad_f_K.T@W)
         H = self.inner(K, self.B.T@S_KW@A_cl_K, V)
         H += self.inner(
             K, 
@@ -299,8 +299,8 @@ class StabilizingGainManifold:
         Returns: (Scalar) d/dt|_{t=0} <E_i, E_j>|_c(t), where c(t) = K + t*E_k.
         """
         return np.trace(
-            self.E(i1, i2).T@self.E(j1, j2)@self.diff_lyapunov_map(
-                self.A_cl(K), 
+            self.E(i1, i2).T@self.E(j1, j2)@self.diff_dlyap(
+                self.A - self.B@K, 
                 self.Sigma, 
                 -self.B@self.E(k1, k2), 
                 np.zeros((self.n, self.n))

@@ -15,6 +15,13 @@ $\newcommand{\diag}{\text{diag}}$
 
 # Journal
 
+
+## 10/3/23
+Mehran liked some of the stuff I showed him below. He wasn't sold on it completely, but he saw potential. He also again pointed to another application. If I could equip $\cal{S}$ with a Riemannian metric so that $\cal{S}$ is geodesically convex, then it could make projection a much much easier process. It's an interesting high level idea. 
+
+I want to write a bit about cones real quick. 
+
+
 ## 10/2/23
 Suppose we have $x_{k+1}=Ax_k+Bu_k$. I grown interest in solving the following problem:
 $$\begin{align} \min_{K \in \cal{G}} f(K) \\ 
