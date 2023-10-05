@@ -5,7 +5,6 @@ import control as ct
 import scipy as sp
 from itertools import product 
 from scipy.linalg import solve_discrete_lyapunov
-import pymanopt
 
 n = 4
 m = 3
