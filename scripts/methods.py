@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.linalg import solve_discrete_lyapunov
 import control as ct
-import itertools
+from itertools import product
 from typing import Tuple
 
 class StabilizingGainManifold:
@@ -11,7 +11,8 @@ class StabilizingGainManifold:
             B: np.ndarray, 
             Q: np.ndarray, 
             R: np.ndarray, 
-            Sigma: np.ndarray
+            Sigma: np.ndarray,
+            sign: bool = False
         ) -> None:
         self.A = A # state matrix
         self.B = B # input matrix
@@ -20,6 +21,7 @@ class StabilizingGainManifold:
         self.n = A.shape[0] # state dim
         self.m = B.shape[1] # input dim
         self.Sigma = Sigma # init positions for cost function computation
+        self.sign = sign # True if we use A + BK, False if we use A - BK
 
     @staticmethod
     def spectral_radius(A: np.ndarray) -> float:
@@ -77,20 +79,36 @@ class StabilizingGainManifold:
             A@StabilizingGainManifold.dlyap(A, Q)@E.T + F
         )
     
+    def A_cl(self, K: np.ndarray) -> np.ndarray:
+        """Return A - BK or A + BK, depending on self.sign."""
+        if self.sign:
+            return self.A + self.B@K
+        else:
+            return self.A - self.B@K
+        
+    def gain_spectral_radius(self, K: np.ndarray) -> float:
+        """returns rho(A + BK) or rho(A - BK), depending on self.sign."""
+        return self.spectral_radius(self.A_cl(K))
+    
     def randvec(self, K: np.ndarray) -> np.ndarray:
         V = np.random.randn(self.m, self.n)
         V = V/self.norm(K, V)
         return V
     
+    def randvec2(self, K: np.ndarray, eps) -> np.ndarray:
+        V = np.random.randn(self.m, self.n)
+        V = V/self.norm2(K, V, eps)
+        return V
+    
     def zerovec(self) -> np.ndarray:
         return np.zeros((self.m, self.n))
     
-    def A_cl(self, K: np.ndarray) -> np.ndarray:
-        return self.A - self.B@K
-    
     def dlqr(self) -> np.ndarray:
         K, _, _ = ct.dlqr(self.A, self.B, self.Q, self.R)
-        return K
+        if self.sign:
+            return -K
+        else:
+            return K
     
     def rand(self) -> np.ndarray:
         """Returns a random gain matrix that stablizes (A,B)."""
@@ -98,7 +116,10 @@ class StabilizingGainManifold:
             2*np.random.randint(2, size=self.n) - 1
         )
         K = ct.place(self.A, self.B, evals)
-        return K
+        if self.sign:
+            return -K
+        else:
+            return K
     
     def finite_horizon_LQR_cost(
             self, x0: np.ndarray, u: np.ndarray, Qf: np.ndarray, N: int
@@ -142,18 +163,27 @@ class StabilizingGainManifold:
 
         Returns: (ndarray(n,n)) The unique solution P to 
         A_cl'*P*A_cl + K'RK + Q = P."""
-        
-        return self.dlyap((self.A - self.B@K).T, K.T@self.R@K + self.Q)
+        return self.dlyap(self.A_cl(K).T, K.T@self.R@K + self.Q)
     
     def dP(self, K: np.ndarray, V: np.ndarray) -> np.ndarray:
         """Differential of P at K along tangent vector V"""
 
-        return self.diff_dlyap(
-            (self.A - self.B@K).T, self.Q + K.T@self.R@K,
-            -V.T@self.B.T,
-            V.T@self.R@K + K.T@self.R@V
+        # return self.diff_dlyap(
+        #     (self.A_cl(K)).T, self.Q + K.T@self.R@K,
+        #     -V.T@self.B.T,
+        #     V.T@self.R@K + K.T@self.R@V
+        # )
+        E = V.T@self.B.T
+        if not self.sign:
+            E = -E
+        F = V.T@self.R@K + K.T@self.R@V
+        A1 = self.A_cl(K).T
+        P_K = self.P(K)
+        return self.dlyap(
+            A1,
+            E@P_K@A1.T + A1@P_K@E.T + F
         )
-        
+
     def Y(self, K: np.ndarray) -> np.ndarray:
         """Special map from Prop III.3 in Policy Optimization over 
         Submanifolds. Returns L(A - BK, Sigma).
@@ -162,20 +192,34 @@ class StabilizingGainManifold:
         
         Returns: (ndarray(n,n)) output of L(A - BK, Sigma)
         """
+        return self.dlyap(self.A_cl(K), self.Sigma)
+    
+    def Y2(self, K:np.ndarray, eps: float) -> np.ndarray:
+        return self.dlyap(self.A_cl(K)/eps, self.Sigma)
         
-        return self.dlyap(self.A - self.B@K, self.Sigma)
-        
-    def dY(self, K: np.ndarray, i1: int, i2: int) -> np.ndarray:
+    def dY(self, K: np.ndarray, V: np.ndarray) -> np.ndarray:
         """Differential of the Y(.) map evaluated on the local frame vector E_i. 
-        
         K: (ndarray(m,n)) Stablizing feedback gain to (A,B)
         
         Returns: (ndarray(m,n)) dY(E_i) at K."""
-        E_i = self.E(i1, i2) 
+        Y_K = self.Y(K)
+        A1 = self.A_cl(K)
+        E = self.B@V
+        if not self.sign:
+            E = -E
+        return self.dlyap(A1, E@Y_K@A1.T + A1@Y_K@E.T)
+    
+    # def dY_i(self, K: np.ndarray, i1: int, i2: int) -> np.ndarray:
+    #     """Differential of the Y(.) map evaluated on the local frame vector E_i. 
         
-        return self.diff_dlyap(
-            self.A - self.B@K, self.Sigma, -self.B@E_i, np.zeros((self.n, self.n))
-        )
+    #     K: (ndarray(m,n)) Stablizing feedback gain to (A,B)
+        
+    #     Returns: (ndarray(m,n)) dY(E_i) at K."""
+    #     E_i = self.E(i1, i2) 
+        
+    #     return self.diff_dlyap(
+    #         self.A_cl(K), self.Sigma, -self.B@E_i, np.zeros((self.n, self.n))
+    #     )
     
     def f(self, K: np.ndarray) -> float:
         """Computes the finite horizon cost function sum_{1:i:n} J_{Sigma_i}(K).
@@ -183,9 +227,14 @@ class StabilizingGainManifold:
         K: (ndarray(m,n)) Stablizing feedback gain to (A,B)
 
         Returns: (scalar) The cost."""
-        if self.spectral_radius(self.A - self.B@K) >= 1:
+        if self.gain_spectral_radius(K) >= 1:
             return float("inf")
         return np.trace(self.P(K)@self.Sigma)/2
+    
+    def df(self, K: np.ndarray, V: np.ndarray) -> float:
+        """Returns directional derivative of f at K along V"""
+
+        return np.trace(self.dP(K,V)@self.Sigma)/2
     
     def df_dE(self, K: np.ndarray, i1: int, i2: int) -> float:
         return np.trace(
@@ -203,7 +252,11 @@ class StabilizingGainManifold:
         
         P_K = self.P(K)
         Y_K = self.Y(K)
-        out = self.R@K - self.B.T@P_K@(self.A - self.B@K)
+        out = None
+        if self.sign:
+            out = self.R@K + self.B.T@P_K@self.A_cl(K)
+        else:
+            out = self.R@K - self.B.T@P_K@self.A_cl(K)
         if Euclidean:
             return out@Y_K
         return out
@@ -211,7 +264,7 @@ class StabilizingGainManifold:
     def hess_f(
         self, K: np.ndarray, V: np.ndarray, W: np.ndarray, Euclidean: bool=False
     ) -> float:
-        A_cl_K = self.A - self.B@K
+        A_cl_K = self.A_cl(K)
         grad_f_K = self.grad_f(K, Euclidean=Euclidean)
         S_KV = self.dlyap(A_cl_K.T, V.T@grad_f_K + grad_f_K.T@V)
         S_KW = self.dlyap(A_cl_K.T, W.T@grad_f_K + grad_f_K.T@W)
@@ -224,7 +277,7 @@ class StabilizingGainManifold:
         if Euclidean:
             return H
 
-        for i1, i2, j1, j2, k1, k2 in itertools.product(
+        for i1, i2, j1, j2, k1, k2 in product(
             range(self.m), range(self.n), repeat=3
         ):
             H -= self.inner(
@@ -243,10 +296,16 @@ class StabilizingGainManifold:
 
         Returns: (scalar) <V, W>|_K
         """
-        return np.trace(V.T@W@self.Y(K))
+        return np.trace(V.T@W@self.Y2(K, .8))
+    
+    def inner2(self, K: np.ndarray, V: np.ndarray, W: np.ndarray, eps: float) -> float:
+        return np.trace(V.T@W@self.Y2(K, eps))
 
     def norm(self, K: np.ndarray, V: np.ndarray) -> float:
         return np.sqrt(self.inner(K, V, V))
+    
+    def norm2(self, K: np.ndarray, V: np.ndarray, eps: float) -> float:
+        return np.sqrt(self.inner(K, V, V, eps))
 
     def g(self, K: np.ndarray, i1: int, i2: int, j1: int, j2: int) -> float:
         """Riemannian metric at K evaluated along global frame coordinate
@@ -262,6 +321,36 @@ class StabilizingGainManifold:
             return Y_K[j2, i2]
         else:
             return 0
+        
+    def g2(
+        self, K: np.ndarray, i1: int, i2: int, j1: int, j2: int, eps: float
+    ) -> float:
+        if i1 == j1:
+            Y_K = self.Y2(K, eps)
+            return Y_K[j2, i2]
+        else:
+            return 0
+        
+    def inv_g2(
+        self, K: np.ndarray, i1: int, i2: int, j1: int, j2: int, eps: float
+    ) -> float:
+        if i1 == j1:
+            Y_K_inv = np.linalg.inv(self.Y2(K, eps))
+            return Y_K_inv[j2, i2]
+        else:
+            return 0
+        
+    def grad_f_2(self, K: np.ndarray, eps:float) -> np.ndarray:
+        out = self.zerovec()
+        for i1, i2, j1, j2 in product(range(self.m), range(self.n), repeat=2):
+            if i1 == j1:
+                E_i = self.E(i1, i2)
+                inv_g_ij = self.inv_g2(K, i1, i2, j1, j2, eps)
+                df_i = self.df(K, E_i)
+                out[j1,j2] += inv_g_ij*df_i
+        return out
+
+
 
     def inv_g(self, K: np.ndarray, i1: int, i2: int, j1: int, j2: int) -> float:
         """Simply the inverse of g(.). 
@@ -300,7 +389,7 @@ class StabilizingGainManifold:
         """
         return np.trace(
             self.E(i1, i2).T@self.E(j1, j2)@self.diff_dlyap(
-                self.A - self.B@K, 
+                self.A_cl(K), 
                 self.Sigma, 
                 -self.B@self.E(k1, k2), 
                 np.zeros((self.n, self.n))
@@ -326,7 +415,7 @@ class StabilizingGainManifold:
 
         Returns: (scalar) Evaluation of Christoffel symbol Gamma_ij^k at K."""
         gamma = 0
-        for l1, l2 in itertools.product(range(self.m), range(self.n)):
+        for l1, l2 in product(range(self.m), range(self.n)):
             gamma_l1l2 = self.dg_dE(K, j1, j2, l1, l2, i1, i2) + \
                             self.dg_dE(K, i1, i2, l1, l2, j1, j2) - \
                             self.dg_dE(K, i1, i2, j1, j2, l1, l2)
@@ -382,7 +471,7 @@ class StabilizingGainManifold:
         R_ijk_l = self.dGamma_dE(K, j1, j2, k1, k2, l1, l2, i1, i2) - \
                     self.dGamma_dE(K, i1, i2, k1, k2, l1, l2, j1, j2)
                     
-        for m1, m2 in itertools.product(range(self.m), range(self.n)):
+        for m1, m2 in product(range(self.m), range(self.n)):
             R_ijk_l += self.Gamma(K, j1, j2, k1, k2, m1, m2)* \
                         self.Gamma(K, i1, i2, m1, m2, l1, l2)
             R_ijk_l -= self.Gamma(K, i1, i2, k1, k2, m1, m2)* \
@@ -402,7 +491,7 @@ class StabilizingGainManifold:
             l2: int
         ) -> float:
         out = 0
-        for m1, m2 in itertools.product(range(self.m), range(self.n)):
+        for m1, m2 in product(range(self.m), range(self.n)):
             out += self.g(K, l1, l2, m1, m2)* \
             self.Riemann_curvature_31(K, i1, i2, j1, j2, k1, k2, m1, m2)
         return out
