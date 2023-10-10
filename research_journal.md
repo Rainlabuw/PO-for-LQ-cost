@@ -11,6 +11,7 @@ $\newcommand{\Bern}{\text{Bernoulli}}$
 $\newcommand{\R}{\mathbb{R}}$
 $\newcommand{\C}{\mathbb{C}}$
 $\newcommand{\ad}{\text{ad}}$
+$\newcommand{\rank}{\text{rank}}$
 $\newcommand{\diag}{\text{diag}}$
 $\newcommand{\cone}{\text{cone}}$
 $\newcommand{\co}{\text{co}}$
@@ -20,6 +21,30 @@ $\newcommand{\spec}{\text{spec}}$
 
 # Journal
 
+## 10/10/23
+I have lots of updates. Let $$\alpha(A):=\max_{\lambda \in \spec(A)} \Re(\lambda)$$ be the **spectral abscissa**. So, $A \in \R^{n \times n}$ is Hurwitz stable if and only if $\alpha(A) < 0$. 
+Define $$\beta_{\cal{S}}(A):=\min_{E \in \R^{n\times n}}\{\|E\|_F:\alpha(A+E)=0\}$$ as the distance to space of Hurwitz unstable matrices. We call $\beta_{\cal{S}}$ the **instability distance**. Also, define $$\beta_{\cal{G}}(K):=\min_{L\in \R^{m \times n}}\{\|L\|_F:\alpha(A+BK+BL)=0\}$$ as the distance to the nearest destabilizing gain. We'll call $\beta_{\cal{G}}$ the **gain instability distance**.
+
+It was proven that $$\beta_\cal{S}(A):=\min_{E \in \R^{n\times n}}\{\|E\|_{F}:\exists \mu \in \R \ \st \det(A-\mu j I + E)=0\}$$$$=\min_{\mu\in \R}\sigma_{\min}(A-\mu j I).$$
+This follows from the fact that $\alpha(A + E)=0$ if and only if there exist $\mu \in \R$ such that $\det(A-\mu j I + E) = 0$. 
+
+Observe the following:
+$$\begin{align*}
+\|B\|_{F}\cdot \beta_{\cal{G}}(K)&= \|B\|_{F}\cdot\min_{L\in \R^{m \times n}}\{\|L\|_F:\alpha(A+BK+BL)=0\} \\
+&\geq \min_{L \in \R^{m \times n}}\{\|BL\|_{F}:\alpha(A+BK+BL)=0\} \\
+& \geq \min_{E \in \R^{n \times n}} \{\|E\|_{F}:\alpha(A+BK+E)=0\} = \beta_{\cal{S}}(A+BK)
+\end{align*}$$
+
+Therefore $$\beta_{\cal{G}}(K) \geq \|B\|_{F}^{-1} \beta_{\cal{S}}(A+BK)$$
+
+
+## 10/5/23
+Recall $S_+^n$ is a proper cone in the space of symmetric matrices $S^n$. By proper, we mean it is closed, convex, solid, and pointed. 
+Let $$\pi(S_+^n) := \{L \in\cal{L}(S^n,S^n):L(S_+^n) \subset S_+^n$$ be the vector space of linear operators on $S^n$ that are $S_+^n$-invariant. Recall that $\pi(S_+^n)$ is itself a proper cone in $\cal{L}(S^n,S^n)$. Also $$\pi(S_+^n)^\circ=\{L \in \cal{L}(S^n,S^n):L(S_+^n-\{0\}) \subset S_{++}^n\}.$$ This implies that operators in $\pi(S_+^n)^\circ$ are $S_{++}^n$-invariant.
+
+Define $\bb{L}:\cal{S} \to \cal{L}(S^n,S^n)$ as follows: $$\bb{L}(A)Q\equiv L_AQ \equiv \sum_{k=0}^\infty A^kQ(A^T)^k.$$ Note that $\bb{L}$ is nonlinear, injective, and analytic.  Define $$\cal{C}:=\bb{L}(\cal{S}) \subset \pi(S_+^n).$$
+
+Suppose I equip $\pi(S_+^n)$ with a Riemannian metric so that it is geodesically convex, such as a log-barriar function. 
 
 ## 10/3/23
 Mehran liked some of the stuff I showed him below. He wasn't sold on it completely, but he saw potential. He doesn't like the idea of an invertible $B$. I don't blame him cause I don't either. He also again pointed to another application. If I could equip $\cal{S}$ with a Riemannian metric so that $\cal{S}$ is geodesically convex, then it could make projection a much much easier process. It's an interesting high level idea. 

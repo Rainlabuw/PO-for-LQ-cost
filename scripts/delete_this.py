@@ -1,48 +1,51 @@
-from methods import StabilizingGainManifold
 import numpy as np 
 import matplotlib.pyplot as plt
 import control as ct
-import scipy as sp
-from itertools import product 
-from scipy.linalg import solve_discrete_lyapunov
 
-n = 4
+alpha = lambda A: np.max(np.real(np.linalg.eig(A)[0]))
+def sigma_min(A):
+    _, S, _ = np.linalg.svd(A)
+    return np.min(S)
+
+def beta_S(A, bound=10, N=10000):
+    n = A.shape[0]
+    mu_span = np.linspace(-bound, bound, N)
+    I = np.eye(n)
+    min_s = -1
+    for mu in mu_span:
+        s = sigma_min(A - mu*1j*I)
+        if min_s == -1 or s < min_s:
+            min_s = s
+    if min_s == -1:
+        return np.inf
+    return min_s
+
+n = 5
 m = 3
-eps = .8
-while True:
-    A, B = StabilizingGainManifold.rand_controllable_matrix_pair(n, m)
-    Sigma = np.eye(n)
-    Q = np.eye(n)
-    R = np.eye(m)
-    M = StabilizingGainManifold(A, B, Q, R, Sigma, True)
-    K_opt = M.dlqr()
-    print(M.gain_spectral_radius(K_opt))
-    
-    if M.gain_spectral_radius(K_opt) > eps + .1:
-        break
-print(M.gain_spectral_radius(K_opt))
+A = np.random.randn(n,n)
+while alpha(A) >= 0:
+    A = np.random.randn(n,n)
 
-# K = M.rand()
-# while M.gain_spectral_radius(K) >= eps:
-#     K = M.rand()
+B = np.random.randn(n,m)
+B_norm = np.linalg.norm(B)
+Q = np.eye(n)
+R = np.eye(m)
+K, _, _ = ct.lqr(A,B,Q,R)
+beta_G_lower_bound = beta_S(A - B@K)/B_norm
 
+min_r = -1
+print(beta_G_lower_bound)
+for _ in range(1000):
+    V = np.random.randn(m,n)
+    V = V/np.linalg.norm(V)
+    r = 0
+    L = K + r*V
+    count = 0
+    while alpha(A - B@L) < 0 and count <= 1000:
+        r += .01
+        L = K + r*V
+        count += 1
 
-# tol = 1e-3
-# norm_grad_hist = []
-# while True:
-#     alpha = .001
-#     f_K = M.f(K)
-#     grad_f_K = M.grad_f_2(K, eps)
-#     K = K - alpha*M.grad_f_2(K, eps)
-#     norm_grad_hist.append(np.linalg.norm(grad_f_K)**2)
-#     out = [np.linalg.norm(grad_f_K)**2, f_K, M.gain_spectral_radius(K), np.linalg.norm(K - K_opt)**2]
-#     out = np.round(out, 2)
-#     print(
-#         f"sq norm of grad: {out[0]}, f(K): {out[1]}, rho(A + BK): {out[2]}, |K - K_opt|^2: {out[3]}"
-#     )
-#     if out[0] < tol:
-#         break
-
-# plt.semilogy(norm_grad_hist)
-# plt.grid()
-# plt.show()
+    if min_r == -1 or r < min_r:
+        min_r = r
+        print(min_r)
